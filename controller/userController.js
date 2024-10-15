@@ -1,6 +1,8 @@
 const Users = require('../models/userSchema');
 const AppError = require('../utils/error');
 const bcrypt = require('bcryptjs');
+const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
 
 const registerUser = async (req, res, next) => {
     try {
@@ -83,6 +85,60 @@ const getUserById = async (req, res, next) => {
 
 }
 
+const forgotPassword = async (req, res) => {
+    const { username} = req.body;
+    Users.findOne({ username })
+        .then(user => {
+            if (!user) {
+                throw new AppError('User not found.', 404)
+            }
+            const token = jwt.sign({ id: user._id }, "jwt_secret_key", { expiresIn: "5h" })
+            var transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    user: process.env.ADMIN_EMAIL,
+                    pass: process.env.EMAIL_PASS
+                }
+            });
 
+            var mailOptions = {
+                from: process.env.ADMIN_EMAIL,
+                to: user.email,
+                subject: 'Reset Password Link',
+                text: `https://fe-user-records-app.onrender.com/pages/resetPassword.html?token=${token}`
+            };
+           
+            transporter.sendMail(mailOptions, function (error, info) {
+                if (error) {
+                    console.log(error);
+                } else {
+                    return res.send({ Status: "Success" })
+                }
+            });
+        })
+}
+const resetPassword = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { password } = req.body;
 
-module.exports = { registerUser, getUsersList, userLogin, getUserById };
+        if (!password) {
+            return res.status(400).send({ message: "Please provide password" });
+        }
+
+        const decode = jwt.verify(token, "jwt_secret_key");
+        const user = await Users.findOne({ _id: decode.id });
+        if(!user){
+            throw new AppError('User not found.', 404)
+
+        }
+        user.password = password;
+        await user.save();
+
+        return res.status(200).send({ message: "Password reset successfully" });
+    } catch (error) {
+        return res.status(500).send({ message: "Something went wrong" });
+    }
+};
+
+module.exports = { registerUser, getUsersList, userLogin, getUserById ,forgotPassword,resetPassword};

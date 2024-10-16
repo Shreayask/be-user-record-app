@@ -54,7 +54,7 @@ const userLogin = async (req, res, next) => {
 const getUsersList = async (req, res, next) => {
     try {
         //get all the user's list
-        const userList = await Users.find({})
+        const userList = await Users.find({admin: false})
         res.send({
             success: true,
             data: userList

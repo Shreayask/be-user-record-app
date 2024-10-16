@@ -20,7 +20,6 @@ mongoose.connect(process.env.DB,{
 })
 app.use(express.json());
 app.use(cors({
-    methods: ['GET', 'POST','PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true // Allow credentials (cookies, authorization headers)
 }));

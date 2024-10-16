@@ -85,39 +85,45 @@ const getUserById = async (req, res, next) => {
 
 }
 
-const forgotPassword = async (req, res) => {
-    const { username} = req.body;
-    Users.findOne({ username })
-        .then(user => {
-            if (!user) {
-                throw new AppError('User not found.', 404)
-            }
-            const token = jwt.sign({ id: user._id }, "jwt_secret_key", { expiresIn: "5h" })
-            var transporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth: {
-                    user: process.env.ADMIN_EMAIL,
-                    pass: process.env.EMAIL_PASS
+const forgotPassword = async (req, res, next) => {
+    try {
+        const { username } = req.body;
+        Users.findOne({ username })
+            .then(user => {
+                if (!user) {
+                    throw new AppError('User not found.', 404)
                 }
-            });
+                const token = jwt.sign({ id: user._id }, "jwt_secret_key", { expiresIn: "5h" })
+                var transporter = nodemailer.createTransport({
+                    service: 'gmail',
+                    auth: {
+                        user: process.env.ADMIN_EMAIL,
+                        pass: process.env.EMAIL_PASS
+                    }
+                });
 
-            var mailOptions = {
-                from: process.env.ADMIN_EMAIL,
-                to: user.email,
-                subject: 'Reset Password Link',
-                text: `https://fe-user-records-app.onrender.com/pages/resetPassword.html?token=${token}`
-            };
-           
-            transporter.sendMail(mailOptions, function (error, info) {
-                if (error) {
-                    console.log(error);
-                } else {
-                    return res.send({ Status: "Success" })
-                }
-            });
-        })
+                var mailOptions = {
+                    from: process.env.ADMIN_EMAIL,
+                    to: user.email,
+                    subject: 'Reset Password Link',
+                    text: `https://fe-user-records-app.onrender.com/pages/resetPassword.html?token=${token}`
+                };
+
+                transporter.sendMail(mailOptions, function (error, info) {
+                    if (error) {
+                        console.log(error);
+                    } else {
+                        return res.send({ Status: "Success" })
+                    }
+                });
+            })
+    }
+    catch (error) {
+        next(error)
+    }
+
 }
-const resetPassword = async (req, res) => {
+const resetPassword = async (req, res, next) => {
     try {
         const { token } = req.params;
         const { password } = req.body;
@@ -128,17 +134,49 @@ const resetPassword = async (req, res) => {
 
         const decode = jwt.verify(token, "jwt_secret_key");
         const user = await Users.findOne({ _id: decode.id });
-        if(!user){
+        if (!user) {
             throw new AppError('User not found.', 404)
 
         }
         user.password = password;
         await user.save();
-
         return res.status(200).send({ message: "Password reset successfully" });
     } catch (error) {
-        return res.status(500).send({ message: "Something went wrong" });
+        next(error)
     }
 };
+const editUser = async (req, res, next) => {
+    try {
+        const userId = req.params.id;
 
-module.exports = { registerUser, getUsersList, userLogin, getUserById ,forgotPassword,resetPassword};
+        const updatedUser = await Users.findByIdAndUpdate(userId, req.body, { new: true, runValidators: true });
+
+        if (!updatedUser) {
+            throw new AppError('User not found.', 404)
+        }
+        res.status(201).json({
+            success: true,
+            data: updatedUser
+        })
+
+
+    } catch (error) {
+        next(error)
+    }
+}
+const deleteUser = async (req, res, next) => {
+    try {
+        const { id } = req.params
+        const deletedUser = await Users.findByIdAndDelete(id);
+        if (!deletedUser) {
+            return res.status(404).send({ message: 'User not found' });
+        }
+        res.status(200).json({
+            success: true,
+            message: "User deleted successfully"
+        })
+    } catch (error) {
+        next(error)
+    }
+}
+module.exports = { registerUser, getUsersList, userLogin, getUserById, forgotPassword, resetPassword, editUser, deleteUser };
